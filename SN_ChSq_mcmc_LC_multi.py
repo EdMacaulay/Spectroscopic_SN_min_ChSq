@@ -16,7 +16,7 @@ def Ez( z, Omega_M, Omega_L, w_o, w_a):
 	a = 1 / (1+z)
 
 	# equation of state of Dark Energy w(z)
-	w_z = w_o + w_a * ( z / a )
+	w_z = w_o + w_a * ( z * a )
 
 	# E(z)
 	Ez = (Omega_L * math.pow( (1+z), (3*(1+w_z)) ) ) +	(Omega_M * math.pow( (1+z), 3) )
