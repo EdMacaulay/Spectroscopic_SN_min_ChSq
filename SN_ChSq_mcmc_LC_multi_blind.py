@@ -85,7 +85,7 @@ def lnprob(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta,blind_values):
 
 
 # defines likelihood.  has to be ln likelihood
-def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta, blind_values):
+def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Cmu, blind_values):
 	
 	
 
@@ -98,7 +98,7 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta, blind_values):
 	my_Om0, my_w0, alpha, beta, M_1_B, Delta_M = theta
 
 
-	# assemble covariance matrix
+	"""# assemble covariance matrix
 	Cmu = np.zeros_like(Ceta[::3, ::3])
 
 	for i, coef1 in enumerate([1., alpha, -beta]):
@@ -108,7 +108,7 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta, blind_values):
 	# Add diagonal term from Eq. 13
 	sigma = np.loadtxt('covmat/sigma_mu.txt')
 	sigma_pecvel = (5 * 150 / 3e5) / (np.log(10.) * sigma[:, 2])
-	Cmu[np.diag_indices_from(Cmu)] += sigma[:, 0] ** 2 + sigma[:, 1] ** 2 + sigma_pecvel ** 2
+	Cmu[np.diag_indices_from(Cmu)] += sigma[:, 0] ** 2 + sigma[:, 1] ** 2 + sigma_pecvel ** 2"""
 
 	# calculate observation
 	mod = mb - (M_1_B - alpha * x1 + beta * color)
@@ -134,7 +134,12 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta, blind_values):
 	ChSq = np.dot(Delta, (np.dot(inv_CM, Delta)))
 
 	# ***** write parameters ******
-	param_file_name = 'my_params_JLA_FlatwCDM_CPL_uncorrected_PV.txt'
+
+
+    t = time.gmtime(time.time())
+    date = '%4d%02d%02d' % (t[0], t[1], t[2])
+
+	param_file_name = 'my_params_JLA_FlatwCDM_CPL_uncorrected_PV_blind_%s.txt'%date
 
 	chain_path = 'Chains/'
 	chain_path_file = chain_path + param_file_name
@@ -145,7 +150,7 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta, blind_values):
 	f_handle.write(stringOut)
 	f_handle.close()
 
-	param_file_name = 'ChSqFile_JLA_FlatwCDM_CPL_uncorrected_PV.txt'
+	param_file_name = 'ChSqFile_JLA_FlatwCDM_CPL_uncorrected_PV_blind_%s.txt'%date
 	chain_path = 'ChSq_Chains/'
 	chain_path_file = chain_path + param_file_name
 	f_handle = open(chain_path_file, 'a')
@@ -157,26 +162,27 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Ceta, blind_values):
 	return -0.5 * ChSq
 
 
-# ****** load eta covariance matrix ****************
+# ****** load eta covariance matrix, now as C_total ****************
 
-#Ceta = sum([pyfits.getdata(mat) for mat in glob.glob('covmat_20160703_copy/C*.fits')])
-Ceta = sum([pyfits.getdata(mat) for mat in glob.glob('covmat/C*.fits')])
-
+#Ceta = sum([pyfits.getdata(mat) for mat in glob.glob('covmat/C*.fits')])
 #Ceta = pyfits.getdata('C_eta_20160610.fits')
 
 
-# ****** load JLA ****************
-FileName = 'jla_lcparams-header.txt'
-DataBlock = np.genfromtxt(FileName, skip_header=1, delimiter=' ')
+date_Cmu = '20160915'
+Cmu = pyfits.getdata('C_total_%s.fits')%date_Cmu
 
-zcmb = DataBlock[:, 1]
-zhel = DataBlock[:, 2]
-mb = DataBlock[:, 4]
-x1 = DataBlock[:, 6]
-color = DataBlock[:, 8]
-thirdvar = DataBlock[:, 10]
-ra = DataBlock[:, 18]
-dec = DataBlock[:, 19]
+# ****** load JLA, now from fits file ****************
+
+FileName = 'DES_20160914.fits'
+
+data = Table.read(FileName)
+
+zcmb = data['zcmb']
+zhel = data['zhel']
+mb = data['mb']
+x1 = data['x1']
+color = data['color']
+thirdvar = data['3rdvar']
 
 
 # ****** load uncorrected redshifts - use instead ****************
@@ -219,6 +225,11 @@ blind_standard_deviation = 0.3
 
 blind_values = []
 blind_index = 0
+
+# seed blind
+
+sd = 'random seed to replace'
+np.random.seed(sd)
 
 for blind_index in range(N_params_to_blind):
 	blind_values = np.append(blind_values, np.random.normal(blind_mean, blind_standard_deviation)  )
