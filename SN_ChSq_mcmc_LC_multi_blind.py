@@ -1,53 +1,48 @@
-# pylint: disable=W0312
+# pylint: disable=W0621
 
-import numpy as np
-import emcee
-import astropy.io.fits as fits
-from astropy.table import Table
-
-#import glob
-
-import scipy
-from scipy.integrate import quad
 import os
-
 import time
-
 import math
 
 from optparse import OptionParser
 
+import numpy as np
+import astropy.io.fits as fits
+from astropy.table import Table
+
+from scipy.integrate import quad
+
+import emcee
 from chainconsumer import ChainConsumer
 
-def Ez( z, Omega_M, Omega_L, w_o, w_a):
+def Ez(z, Omega_M, Omega_L, w_o, w_a):
 
     # scale factor
     a = 1 / (1+z)
 
     # equation of state of Dark Energy w(z) (CPL)
-    w_z = w_o + w_a * ( z * a )
+    w_z = w_o + w_a * (z * a)
 
     # E(z)
-    Ez = (Omega_L * math.pow( (1+z), (3*(1+w_z)) ) ) +    (Omega_M * math.pow( (1+z), 3) )
+    Ez = (Omega_L * math.pow((1+z), (3*(1+w_z)))) +    (Omega_M * math.pow((1+z), 3))
 
-    Ez = math.sqrt( Ez )
+    Ez = math.sqrt(Ez)
     Ez = 1.0 / Ez
 
     return Ez
 
 
-def Luminosity_Distance( z_hel, z_cmb, Omega_M, Omega_L, w_o, w_a):
-
+def Luminosity_Distance(z_hel, z_cmb, Omega_M, Omega_L, w_o, w_a):
 
     # factor in units
-    Dc = Comoving_Distance( z_cmb, Omega_M, Omega_L, w_o, w_a)
+    Dc = Comoving_Distance(z_cmb, Omega_M, Omega_L, w_o, w_a)
 
     # calculate the luminosity distance
     Dl = Dc * (1.0+z_hel)
 
     return Dl
 
-def Comoving_Distance( z, Omega_M, Omega_L, w_o, w_a):
+def Comoving_Distance(z, Omega_M, Omega_L, w_o, w_a):
 
     # Speed of light, in km / s
     cLight = 299792.458
@@ -56,7 +51,7 @@ def Comoving_Distance( z, Omega_M, Omega_L, w_o, w_a):
     H_o = 70.0
 
     # integrate E(z) to get comoving distance
-    Dc, error = quad( Ez, 0, z, args=(Omega_M, Omega_L, w_o, w_a)  )
+    Dc, error = quad(Ez, 0, z, args=(Omega_M, Omega_L, w_o, w_a))
 
     # factor in units
     Dc = Dc* (cLight/H_o)
@@ -64,13 +59,13 @@ def Comoving_Distance( z, Omega_M, Omega_L, w_o, w_a):
     return Dc
 
 
-def distance_modulus( z_hel, z_cmb, Omega_M, Omega_L, w_o, w_a   ):
+def distance_modulus(z_hel, z_cmb, Omega_M, Omega_L, w_o, w_a):
 
     # get the luminosity distance
-    d_L = Luminosity_Distance( z_hel, z_cmb, Omega_M, Omega_L, w_o, w_a)
+    d_L = Luminosity_Distance(z_hel, z_cmb, Omega_M, Omega_L, w_o, w_a)
 
     # convert to distance modulus
-    mu = 25 + 5.0 *  np.log10( d_L  )
+    mu = 25 + 5.0 *  np.log10(d_L)
 
     return mu
 
@@ -94,8 +89,7 @@ def lnprob(theta, zhel, zcmb, mb, x1, color, thirdvar, Cmu, blind_values):
 
 # defines likelihood.  has to be ln likelihood
 def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Cmu, blind_values):
-    
-    
+
 
     # fold in blinding
     blind_index = 0
@@ -124,14 +118,11 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Cmu, blind_values):
 
     Delta = mod - mod_theory
 
-    #print 'ok so far'
-    #inv_CM = scipy.linalg.inv(Cmu) #my np.linalg crashes python BZ
     inv_CM = np.linalg.pinv(Cmu)
 
     ChSq = np.dot(Delta, (np.dot(inv_CM, Delta)))
 
     # ***** write parameters ******
-
 
     param_file_name = 'my_params_JLA_FlatwCDM_CPL_uncorrected_PV_blind_%s.txt'%date
 
@@ -159,29 +150,29 @@ def lnlike(theta, zhel, zcmb, mb, x1, color, thirdvar, Cmu, blind_values):
 
 
 if __name__ == '__main__':
-        
+
     t = time.gmtime(time.time())
     date = '%4d%02d%02d' % (t[0], t[1], t[2])
 
     parser = OptionParser()
 
-    parser.add_option('-l', '--lcfits', dest='lcfits', #default= ''
-              help='fits file containing all SN data including light curve fits')
+    parser.add_option('-l', '--lcfits', dest='lcfits', default= 'fake_DES_data.fits',
+                      help='fits file containing all SN data including light curve fits')
 
-    parser.add_option('-C', '--covmat', dest='covmat', #default = ''
-              help='total SN magnitude covariance matrix (C_total*.fits from Covariance code)')
+    parser.add_option('-C', '--covmat', dest='covmat', default = 'C_total_20161004.fits',
+                      help='total SN magnitude covariance matrix (C_total*.fits from Covariance code)')
 
-    parser.add_option('-c', '--chains', dest='chains', default='Chains_%s'%date,
-              help='directory to store chains')
+    parser.add_option('-c', '--chains', dest='chains', default='Chains-%s'%date,
+                      help='directory to store chains')
     
-    parser.add_option('-w', '--nwalkers', dest='nwalkers', default=200,
-              help='number of walkers')
+    parser.add_option('-w', '--nwalkers', dest='nwalkers', default=50,
+                      help='number of walkers')
     
-    parser.add_option('-s', '--nSteps', dest='nSteps', default=1000,
-              help='number of walkers')
+    parser.add_option('-s', '--nSteps', dest='nSteps', default=200,
+                      help='number of walkers')
     
-    #parser.add_option('-p', '--plot', action='store_true', default=False,
-    #          help='plot walkers and contours with ChainConsumer')
+    parser.add_option('-p', '--plot', action='store_true', default=False,
+                      help='plot walkers and contours with ChainConsumer')
     
     (options, args) = parser.parse_args()
     
@@ -222,8 +213,8 @@ if __name__ == '__main__':
 
     # how many parameters to fit
     ndim = len(startValues)
-    nSteps = options.nSteps
-    nwalkers = options.nwalkers
+    nSteps = int(options.nSteps)
+    nwalkers = int(options.nwalkers)
     
     # *** make blinding values ***
     
@@ -241,7 +232,7 @@ if __name__ == '__main__':
     np.random.seed(sd)
     
     for blind_index in range(N_params_to_blind):
-        blind_values = np.append(blind_values, np.random.normal(blind_mean, blind_standard_deviation)  )
+        blind_values = np.append(blind_values, np.random.normal(blind_mean, blind_standard_deviation))
 
     # save the blind values.  Maybe add a run or date string so they don't get overwritten
     np.save('blind_values.npy', blind_values)
@@ -256,3 +247,19 @@ if __name__ == '__main__':
     # run the sampler
     # how many steps (will have nSteps*nwalkers of samples)
     sampler.run_mcmc(pos, nSteps)
+
+    if options.plot:
+        burnin = 0 # change
+        data = np.genfromtxt(options.chains + '/my_params_JLA_FlatwCDM_CPL_uncorrected_PV_blind_%s.txt'%date, delimiter = ',')
+        data = data[burnin:]
+        c = ChainConsumer()
+        c.add_chain(data, parameters = [r'$\Omega_m$', r'$w_0$', r'$\\alpha$', r'$\beta$', r'$M_B$',r'$\Delta_M$'])
+        params = c.get_summary()
+        print params.keys()
+
+        figw = c.plot_walks()
+        figw.show()
+        fig = c.plot()
+        figw.savefig(options.chains+ '/walks.png')
+        fig.savefig(options.chains + '/marginals.png')
+        fig.show()
